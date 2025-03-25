@@ -14,7 +14,7 @@ newtype Grammar = Grammar [Transition]
 newtype Automaton = Automaton [String]
 
 
-parseGram :: String -> Grammar
+parseGram :: String -> IO (Either String Grammar)
 
 normalizeGram :: Grammar -> Grammar
 
