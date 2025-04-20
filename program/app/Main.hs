@@ -1,6 +1,21 @@
 module Main (main) where
 
 import Lib
+import System.IO (hFlush, stdout)
 
 main :: IO ()
-main = someFunc
+main = do
+    putStrLn "Write some correct rules!"
+    parsed <- readAndParseGrammar
+    case parsed of
+        Left err -> error err
+        Right gram -> putStrLn (show gram)
+    putStrLn "\n\nWow! Not bad!"
+    putStrLn "----------------------------\n\n"
+    putStrLn "Should we try building DFA with dat one???? :))))"
+    putStrLn "Ill do it anyway"
+
+    case parsed of
+        Right gram -> printDFA (buildDFA gram)
+    putStrLn "\n\nNice job! ;)))"
+    hFlush stdout
