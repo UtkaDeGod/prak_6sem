@@ -1,16 +1,30 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Lib where
+module Lib (
+    someFunc,
+    State(..),
+    Terminal(..),
+    Rule(..),
+    Grammar(..),
+    readAndParseGrammar,
+    parseGrammar,
+    parseRule,
+    parseRHS,
+    DFAState(..),
+    Transition(..),
+    DFA(..),
+    buildDFA,
+    printDFA,
+    getTerminal,
+    getState,
+    getDFAState,
+    getTransitions
+) where
 import Data.List (nub)
 import Data.Char (isAlpha, isLower, isSpace)
-import Control.Monad (unless)
 import System.IO (hIsEOF, stdin)
 import Data.List.Split (splitOn)
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
 
-
--- Типы данных для представления грамматики
+-- Data types for representing grammar
 newtype State = State String deriving (Eq, Ord, Show)
 newtype Terminal = Terminal Char deriving (Eq, Ord, Show)
 data Rule = Rule {
@@ -19,13 +33,13 @@ data Rule = Rule {
 } deriving (Eq, Show)
 newtype Grammar = Grammar [Rule] deriving (Show)
 
--- Главная функция: читает ввод и парсит грамматику
+-- Main function: reads input and parses grammar
 readAndParseGrammar :: IO (Either String Grammar)
 readAndParseGrammar = do
     input <- readLinesUntilEOF
     return (parseGrammar input)
 
--- Чтение строк до EOF
+-- Read lines until EOF
 readLinesUntilEOF :: IO String
 readLinesUntilEOF = do
     eof <- hIsEOF stdin
@@ -36,32 +50,32 @@ readLinesUntilEOF = do
             rest <- readLinesUntilEOF
             return (line ++ "\n" ++ rest)
 
--- Парсинг грамматики из строки
+-- Parse grammar from input string
 parseGrammar :: String -> Either String Grammar
 parseGrammar input = do
-    let cleanedInput = filter (not . isSpace) input  -- Удаляем все пробелы
+    let cleanedInput = filter (not . isSpace) input  -- Remove all spaces
     case cleanedInput of
-        'S':xs -> do
+        'S':_ -> do
             let ruleStrings = splitOn ";" cleanedInput
             rules <- mapM parseRule ruleStrings
             return (Grammar (nub (concat rules)))
         _ -> Left $ "First state must be S: " ++ input
 
--- Вспомогательные функции для парсинга
+-- Helper functions for parsing
 parseRule :: String -> Either String [Rule]
 parseRule str = case span isAlpha str of
     ([lhsStr], '=':rest) -> do
-        let lhs = State [lhsStr]
+        let lhsCur = State [lhsStr]
         rhsParts <- mapM parseRHS (splitOn "|" rest)
-        return [Rule lhs rhs | rhs <- rhsParts]
+        return [Rule lhsCur rule | rule <- rhsParts]
     _ -> Left $ "Invalid rule format: " ++ str
 
 parseRHS :: String -> Either String (Either Terminal (Terminal, State))
 parseRHS [c] | isLower c = Right $ Right (Terminal c, State "F")
 parseRHS (c:[s]) | isLower c && isAlpha s = Right $ Right (Terminal c, State [s])
 parseRHS s = Left $ "Invalid RHS format: " ++ s
--- Типы данных для автомата
 
+-- Data types for DFA
 newtype DFAState = DFAState [State] deriving (Eq, Ord, Show)
 newtype Transition = Transition ((DFAState, Terminal), DFAState) deriving (Show)
 
@@ -73,9 +87,7 @@ data DFA = DFA {
     dfaAcceptStates :: [DFAState]
 } deriving (Show)
 
-
-
--- Вспомогательные функции
+-- Helper functions
 getTerminal :: Terminal -> Char
 getTerminal (Terminal c) = c
 
@@ -85,16 +97,14 @@ getState (State s) = s
 getDFAState :: DFAState -> [State]
 getDFAState (DFAState ss) = ss
 
--- Функция для получения всех переходов из состояния по символу
+-- Get all transitions from a state by a symbol
 getTransitions :: Grammar -> State -> Terminal -> [State]
 getTransitions (Grammar grammar) (State state) symbol = nub $
     [ State (getState nt') 
     | Rule nt (Right (t, nt')) <- grammar, 
       state == getState nt, t == symbol]
 
-
-
--- Функция для построения ДКА
+-- Build DFA from a grammar
 buildDFA :: Grammar -> DFA
 buildDFA (Grammar grammar) = DFA {
     dfaStates = states,
@@ -104,18 +114,15 @@ buildDFA (Grammar grammar) = DFA {
     dfaAcceptStates = acceptStates'
 }
   where
-    -- Получаем все нетерминалы
-    nonTerminals = nub $ map lhs grammar
     
-    -- Получаем все терминалы
+    -- Extract all terminals
     terminals = nub ([t | Rule _ (Left t) <- grammar] ++ 
                 [t | Rule _ (Right (t, _)) <- grammar])
     
-    -- Начальное состояние - стартовый нетерминал
+    -- Initial state is the starting nonterminal
     startState' = DFAState [State "S"]
     
-    
-    -- Построение всех состояний ДКА
+    -- Construct all DFA states
     states = [s | s <- (nub $ buildAllStates [startState'] []), s /= (DFAState [])]
       where
         buildAllStates :: [DFAState] -> [DFAState] -> [DFAState]
@@ -124,31 +131,33 @@ buildDFA (Grammar grammar) = DFA {
             | current `elem` visited = buildAllStates rest visited
             | otherwise = 
                 let newStates = [nub $ concat(map (\(State s) -> 
-                      getTransitions (Grammar grammar) (State s) t) (getDFAState current)) | t <- terminals ]
+                      getTransitions (Grammar grammar) (State s) t) (getDFAState current)) |
+                      t <- terminals ]
                     allNew = nub $ newStates
                     next = rest ++ filter (\x -> not (elem x visited)) [DFAState s | s <- allNew]
                 in buildAllStates next (current:visited)
 
     transitions = 
         [ Transition ((state, t), DFAState (nub nextStates))
-        | state@(DFAState states) <- states,
+        | state@(DFAState stateGroup) <- states,
           t <- terminals,
-          let nextStates = concatMap (\(State s) -> getTransitions (Grammar grammar) (State s) t) states,
+          let nextStates = 
+                concatMap (\(State s) -> getTransitions (Grammar grammar) (State s) t) stateGroup,
           not (null nextStates)]
 
-    -- Финальные состояния
+    -- Accept states
     acceptStates' = [(DFAState [State "F"])] ++ filter isAccepting states
       where
-        isAccepting (DFAState states) =
-            any (\(State s) -> any (\(Rule nt rhs) -> State s == nt && 
-                         case rhs of 
+        isAccepting (DFAState st) =
+            any (\(State s) -> any (\(Rule nt r) -> State s == nt && 
+                         case r of 
                              Left _ -> True
                              Right (_, State "F") -> True
-                             Right _ -> False) grammar) states
-            || (startState' == DFAState states && 
-                any (\(Rule nt rhs) -> nt == State "S") grammar)
+                             Right _ -> False) grammar) st
+            || (startState' == DFAState st && 
+                any (\(Rule nt _) -> nt == State "S") grammar)
 
--- Функция для печати ДКА в читаемом виде
+-- Print DFA in a readable format
 printDFA :: DFA -> IO ()
 printDFA dfa = do
     putStrLn "DFA states:"

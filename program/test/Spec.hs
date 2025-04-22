@@ -1,4 +1,3 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 import Lib
 import System.IO (hFlush, stdout)
 
