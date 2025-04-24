@@ -1,4 +1,5 @@
-import Lib
+import Lib_types()
+import Lib_functions
 import System.IO (hFlush, stdout)
 
 main :: IO ()

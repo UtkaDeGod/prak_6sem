@@ -25,7 +25,8 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Lib_functions
+      Lib_types
   other-modules:
       Paths_program
   autogen-modules:

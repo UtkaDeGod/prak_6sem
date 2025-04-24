@@ -1,16 +1,8 @@
-module Lib (
-    someFunc,
-    State(..),
-    Terminal(..),
-    Rule(..),
-    Grammar(..),
+module Lib_functions (
     readAndParseGrammar,
     parseGrammar,
     parseRule,
     parseRHS,
-    DFAState(..),
-    Transition(..),
-    DFA(..),
     buildDFA,
     printDFA,
     getTerminal,
@@ -18,20 +10,12 @@ module Lib (
     getDFAState,
     getTransitions
 ) where
+import Lib_types
 import Data.List (nub)
 import Data.Char (isAlpha, isLower, isSpace)
 import System.IO (hIsEOF, stdin)
 import Data.List.Split (splitOn)
 
-
--- Data types for representing grammar
-newtype State = State String deriving (Eq, Ord, Show)
-newtype Terminal = Terminal Char deriving (Eq, Ord, Show)
-data Rule = Rule {
-    lhs :: State,
-    rhs :: Either Terminal (Terminal, State)
-} deriving (Eq, Show)
-newtype Grammar = Grammar [Rule] deriving (Show)
 
 -- Main function: reads input and parses grammar
 readAndParseGrammar :: IO (Either String Grammar)
@@ -74,18 +58,6 @@ parseRHS :: String -> Either String (Either Terminal (Terminal, State))
 parseRHS [c] | isLower c = Right $ Right (Terminal c, State "F")
 parseRHS (c:[s]) | isLower c && isAlpha s = Right $ Right (Terminal c, State [s])
 parseRHS s = Left $ "Invalid RHS format: " ++ s
-
--- Data types for DFA
-newtype DFAState = DFAState [State] deriving (Eq, Ord, Show)
-newtype Transition = Transition ((DFAState, Terminal), DFAState) deriving (Show)
-
-data DFA = DFA {
-    dfaStates :: [DFAState],
-    dfaAlphabet :: [Terminal],
-    dfaTransitions :: [Transition],
-    dfaStartState :: DFAState,
-    dfaAcceptStates :: [DFAState]
-} deriving (Show)
 
 -- Helper functions
 getTerminal :: Terminal -> Char
